@@ -299,7 +299,8 @@ fit_ar1wn_residuals_bayesian <- function(ts, verbose = FALSE,
     
     # ========== Convergence Diagnostics ==========
     # Gelman-Rubin statistic (should be < 1.05 for convergence)
-    gelman_diag <- gelman.diag(samples, confidence = 0.95)
+    params_only <- samples[, c("phi", "mu", "Ivar", "Evar"), drop = FALSE]
+    gelman_diag <- gelman.diag(params_only, confidence = 0.95)
     gelman_psrf <- gelman_diag$psrf[, "Point est."]
     
     # Check if all parameters converged

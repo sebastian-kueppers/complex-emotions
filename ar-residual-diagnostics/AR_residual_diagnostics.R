@@ -99,7 +99,7 @@ results_parallel <- task_data %>%
   mutate(
     result = future_pmap(
       list(ts, uuid, emotion),
-      fit_both_models,
+      fit_ar1wn_residuals_parallel,
       .progress = TRUE
     )
   )

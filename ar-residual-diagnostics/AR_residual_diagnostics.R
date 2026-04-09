@@ -107,6 +107,13 @@ results_parallel <- task_data %>%
 end_time <- Sys.time()
 duration <- difftime(end_time, start_time, units = "mins")
 
+log_message <- sprintf(
+  "[%s] Dauer: %.2f Minuten\n",
+  format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+  as.numeric(duration)
+)
+cat(log_message, file = "log.txt", append = TRUE)
+
 # Save
 saveRDS(results_parallel, file = "ARWN_results.rds")
 

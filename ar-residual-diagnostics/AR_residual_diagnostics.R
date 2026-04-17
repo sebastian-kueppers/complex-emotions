@@ -7,9 +7,12 @@ library(dplyr)
 library(FKF)
 library(tseries) 
 library(tidyverse)
+library(future)
+library(furrr)
 
 # set wd 
-setwd("...")
+# setwd("...")
+setwd("C:/Users/Sebastian Küppers/Desktop/Formal Theory of Co-Occuring Emotions (DFG project)/_PhD/_PhD_Study_1/Research Exchange/PROJECT/Preregistration/github/ar-residual-diagnostics")
 
 # load data
 data <- read.csv("data_FEEL_Study_1.csv")
@@ -43,7 +46,7 @@ emotions <- c(items.pos, items.neg)
 
 ## --------------------------------
 # Setup parallel ------------------
-
+# 
 n_cores <- availableCores() - 1
 plan(multisession, workers = n_cores)
 
@@ -67,10 +70,10 @@ fit_ar1wn_residuals_parallel <- function(ts, uuid, emotion) {
   tryCatch({
     # Frequentist
     freq_result <- fit_ar1wn_residuals(ts, verbose = FALSE)
-    
+
     # Bayesian
     bayes_result <- fit_ar1wn_residuals_bayesian(ts, verbose = FALSE)
-    
+
     # Return both
     list(
       uuid = uuid,
@@ -117,158 +120,40 @@ cat(log_message, file = "log.txt", append = TRUE)
 # Save
 saveRDS(results_parallel, file = "ARWN_results.rds")
 
-# # Setup progress bar and output data frame
-# total_iterations <- length(uuids.sub) * length(emotions)
-# pb <- txtProgressBar(min = 0, max = total_iterations, style = 3)
-# iteration <- 0
-# 
-# # Initialize empty result list
-# results.ARWN <- list()
-# results.ARWN.bayesian <- list()
-# 
-# # loop
-# for (uuid in uuids.sub) {
-#   temp <- data.sub %>% filter(UUID == uuid)
-#   
-#   for (e in emotions) {
-#     iteration <- iteration + 1
-#     setTxtProgressBar(pb, iteration)
-#     
-#     ts <- na.omit(temp[[e]])
-#     
-#     # --- Fit AR(1)+WN model from helper functions
-#     
-#     # Frequentist:
-#     arwn.res <- fit_ar1wn_residuals(ts)
-#     
-#     # Bayesian:
-#     arwn.res.bayes <- fit_ar1wn_residuals_bayesian(ts)
-#     
-#     results.ARWN[[uuid]][[e]] <- arwn.res
-#     results.ARWN.bayesian[[uuid]][[e]] <- arwn.res.bayes
-#   }
-# }
-# 
-# close(pb)
-# 
-# ## --------------------------------
-# # Check Heywood Cases -------------
-# 
-# # Check for Heywood cases across all time series
-# heywood_summary <- data.frame()
-# 
-# for (uuid in names(results.ARWN)) {
-#   for (emotion in names(results.ARWN[[uuid]])) {
-#     res <- results.ARWN[[uuid]][[emotion]]
-#     
-#     heywood_summary <- rbind(heywood_summary, data.frame(
-#       UUID = uuid,
-#       Emotion = emotion,
-#       convergence = res$convergence,
-#       heywood_ivar = res$heywood_ivar,
-#       heywood_evar = res$heywood_evar,
-#       ivar = res$ivar,
-#       evar = res$evar
-#     ))
-#   }
-# }
-# 
-# 
-# ## --------------------------------
-# # BDS Test on Residuals -----------
-# 
-# # Calculate total iterations
-# total_iterations <- sum(sapply(results.ARWN, function(x) length(x)))
-# 
-# # Setup progress bar
-# pb <- txtProgressBar(min = 0, max = total_iterations, style = 3)
-# iteration <- 0
-# 
-# # Initialize BDS results data frame with bootstrap
-# bds_results <- data.frame()
-# 
-# # Loop through all time series and perform bootstrap BDS test
-# for (uuid in names(results.ARWN)) {
-#   for (emotion in names(results.ARWN[[uuid]])) {
-#     
-#     # Progress bar update
-#     iteration <- iteration + 1
-#     setTxtProgressBar(pb, iteration)
-#     
-#     res <- results.ARWN[[uuid]][[emotion]]
-#     
-#     # Extract measurement-error-free residuals
-#     residuals <- res$residuals
-#     
-#     # Perform bootstrap BDS test
-#     tryCatch({
-#       bds_boot_result <- bds_test_bootstrap(residuals, m = 2, eps = 1, n_bootstrap = 499)
-#       
-#       # Get Heywood status
-#       heywood_row <- heywood_summary[heywood_summary$UUID == uuid & heywood_summary$Emotion == emotion, ]
-#       has_heywood <- heywood_row$heywood_ivar | heywood_row$heywood_evar
-#       
-#       # Add to results
-#       bds_results <- rbind(bds_results, data.frame(
-#         UUID = uuid,
-#         Emotion = emotion,
-#         n_obs = length(residuals),
-#         bds_statistic = bds_boot_result$bds_statistic,
-#         bds_pvalue_parametric = bds_boot_result$bds_pvalue_parametric,
-#         bds_pvalue_empirical = bds_boot_result$bds_pvalue_empirical,
-#         heywood_ivar = heywood_row$heywood_ivar,
-#         heywood_evar = heywood_row$heywood_evar,
-#         has_heywood = has_heywood,
-#         residuals_mean = mean(residuals),
-#         residuals_sd = sd(residuals),
-#         stringsAsFactors = FALSE
-#       ))
-#     }, error = function(e) {
-#       cat("Error in bootstrap BDS test for", uuid, "-", emotion, ":", e$message, "\n")
-#     })
-#   }
-# }
-# 
-# close(pb)
-# 
-# # Check results
-# head(bds_results)
-# 
-# 
-# # --- Compare Heywood cases and valid cases ---
-# heywood_cases <- bds_results[bds_results$has_heywood == TRUE,] # 219
-# valid_cases <- bds_results[bds_results$has_heywood == FALSE,] # 141
-# 
-# # Test 1: Difference of BDS statistic
-# t.test(valid_cases$bds_statistic, heywood_cases$bds_statistic)
-# 
-# # Welch Two Sample t-test
-# # 
-# # data:  valid_cases$bds_statistic and heywood_cases$bds_statistic
-# # t = -1.5242, df = 356.39, p-value = 0.1284
-# # alternative hypothesis: true difference in means is not equal to 0
-# # 95 percent confidence interval:
-# #   -1.2065712  0.1529391
-# # sample estimates:
-# #   mean of x mean of y 
-# # 3.547910  4.074726 
-# 
-# ### -> No difference in BDS statistic.
-# 
-# # Test 2: Difference in probability of significant Bootstrap BDS tests
-# t <- matrix(c(
-#   sum(valid_cases$bds_pvalue_empirical < 0.05),
-#   sum(valid_cases$bds_pvalue_empirical >= 0.05),
-#   sum(heywood_cases$bds_pvalue_empirical < 0.05),
-#   sum(heywood_cases$bds_pvalue_empirical >= 0.05)
-# ), nrow = 2, byrow = TRUE)
-# 
-# rownames(t) <- c("Valid Cases", "Heywood Cases")
-# colnames(t) <- c("Reject H0", "Fail to Reject H0")
-# chisq.test(t)
-# # Pearson's Chi-squared test with Yates' continuity correction
-# # 
-# # data:  t
-# # X-squared = 1.4954e-30, df = 1, p-value = 1
-# 
-# ### -> No difference in probability of significant bootstrap test.
+plan(sequential)
+
+
+# Read data
+results <- readRDS("ARWN_results.rds")
+
+## --------------------------------
+# CONVERGENCE AND HEYWOOD CASES ---
+## --------------------------------
+
+nonvalid_rows_bayesian <- c()
+
+for (i in 1:length(results$result)) {
+  bayesian <- results$result[[i]]$bayesian
+  if (is.null(bayesian)) nonvalid_rows_bayesian <- c(nonvalid_rows_bayesian, i)
+}
+
+length(nonvalid_rows_bayesian) # 20
+
+# ---> 20 rows with problems in Bayesian estimation. Can possibly be reduced by
+# ---> tweaking init parameters.
+
+
+## --------------------------------
+# HEYWOOD CASES -------------------
+
+# Frequentist Heywood (any)
+freq_heywood_idx <- which(map_lgl(results$result, 
+                                  ~.$frequentist$heywood_ivar | .$frequentist$heywood_evar))
+length(freq_heywood_idx) # 219
+length(freq_heywood_idx) / nrow(results) # 0.608
+
+# Bayesian Heywood (any, only successful)
+bayes_heywood_idx <- which(map_lgl(results$result, 
+                                   ~!is.null(.$bayesian) && (.$bayesian$heywood_ivar | .$bayesian$heywood_evar)))
+
+length(bayes_heywood_idx) # 0
